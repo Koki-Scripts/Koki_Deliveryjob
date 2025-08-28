@@ -6,15 +6,18 @@ local carryingPackage = false
 local packageObj = nil
 
 local deliveryBlip = nil
-local returnBlip = nil
 
 function AttachPackage()
     lib.requestModel(`prop_cs_cardbox_01`, 5000)
     packageObj = CreateObject(`prop_cs_cardbox_01`, 0, 0, 0, true, true, true)
-    AttachEntityToEntity(packageObj, PlayerPedId(), GetPedBoneIndex(PlayerPedId(), 57005), 0.25, 0.0, 0.0, 0.0, 90.0, 90.0, true, true, false, true, 1, true)
+    AttachEntityToEntity(packageObj, PlayerPedId(), GetPedBoneIndex(PlayerPedId(), 57005),
+        0.25, 0.0, 0.0, 0.0, 90.0, 90.0,
+        true, true, false, true, 1, true)
+
     RequestAnimDict("anim@heists@box_carry@")
     while not HasAnimDictLoaded("anim@heists@box_carry@") do Wait(10) end
-    TaskPlayAnim(PlayerPedId(), "anim@heists@box_carry@", "idle", 8.0, -8, -1, 49, 0, false, false, false)
+    TaskPlayAnim(PlayerPedId(), "anim@heists@box_carry@", "idle",
+        8.0, -8, -1, 49, 0, false, false, false)
 end
 
 function RemovePackage()
@@ -23,7 +26,14 @@ function RemovePackage()
 end
 
 function DeliverPackage(targetId)
-    lib.progressBar({duration=3000, label='Doručuješ balík...', useWhileDead=false, canCancel=false, disable={car=true, move=true}})
+    lib.progressBar({
+        duration = 3000,
+        label = 'Doručuješ balík...',
+        useWhileDead = false,
+        canCancel = false,
+        disable = {car = true, move = true}
+    })
+
     RemovePackage()
     carryingPackage = false
     deliveriesDone = deliveriesDone + 1
@@ -32,8 +42,11 @@ function DeliverPackage(targetId)
     if deliveryBlip then RemoveBlip(deliveryBlip) deliveryBlip=nil end
 
     if deliveriesDone >= Config.MaxDeliveries then
-        lib.notify({title='Rozvoz', description='Doručil jsi všechny balíky. Vrať auto.', type='success'})
-        AddReturnPoint()
+        lib.notify({
+            title='Rozvoz',
+            description='Doručil jsi všechny balíky. Vrať se zpět k depu a odevzdej auto.',
+            type='success'
+        })
     else
         NextDelivery()
     end
@@ -54,8 +67,7 @@ function TakePackage()
         label = 'Bereš balík z kufru...',
         useWhileDead = false,
         canCancel = false,
-        disable = {car = true, move = true},
-        anim = { dict = "mini@repair", clip = "fixing_a_ped", flags = 49 }
+        disable = {car = true, move = true}
     }) then
         ClearPedTasks(PlayerPedId())
         carryingPackage = true
@@ -82,8 +94,11 @@ end
 
 function NextDelivery()
     if deliveriesDone >= Config.MaxDeliveries then
-        lib.notify({title='Rozvoz', description='Doručil jsi všechny balíky. Vrať auto.', type='success'})
-        AddReturnPoint()
+        lib.notify({
+            title='Rozvoz',
+            description='Doručil jsi všechny balíky. Vrať se zpět k depu a odevzdej auto.',
+            type='success'
+        })
         return
     end
 
@@ -114,7 +129,9 @@ function NextDelivery()
         })
     end
 
-    lib.notify({title='Rozvoz', description=('Zbývá %s/%s balíků.'):format(deliveriesDone, Config.MaxDeliveries), type='inform'})
+    lib.notify({title='Rozvoz',
+        description=('Zbývá %s/%s balíků.'):format(deliveriesDone, Config.MaxDeliveries),
+        type='inform'})
 end
 
 function StartJob()
@@ -124,7 +141,13 @@ function StartJob()
     DoScreenFadeOut(800)
     Wait(1500)
 
-    lib.progressBar({duration=3000,label='Připravuješ vozidlo...', useWhileDead=false, canCancel=false, disable={car=true, move=true}})
+    lib.progressBar({
+        duration=3000,
+        label='Připravuješ vozidlo...',
+        useWhileDead=false,
+        canCancel=false,
+        disable={car=true, move=true}
+    })
 
     local spawn = Config.VehicleSpawn
     lib.requestModel(Config.Vehicle,5000)
@@ -138,7 +161,6 @@ end
 function EndJob()
     if DoesEntityExist(currentVehicle) then DeleteVehicle(currentVehicle) end
     if deliveryBlip then RemoveBlip(deliveryBlip) deliveryBlip=nil end
-    if returnBlip then RemoveBlip(returnBlip) returnBlip=nil end
 
     TriggerServerEvent('delivery:finishJob', deliveriesDone)
 
@@ -150,33 +172,16 @@ function EndJob()
     RemovePackage()
 end
 
-function AddReturnPoint()
-    if returnBlip then RemoveBlip(returnBlip) returnBlip=nil end
-    returnBlip = AddBlipForCoord(Config.FinishJob)
-    SetBlipSprite(returnBlip,50)
-    SetBlipScale(returnBlip,0.9)
-    SetBlipColour(returnBlip,1)
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentString('Vrácení dodávky')
-    EndTextCommandSetBlipName(returnBlip)
-    SetBlipRoute(returnBlip,true)
-    SetBlipRouteColour(returnBlip,1)
-
-    lib.registerContext({
-        id='finish_delivery_menu',
-        title='Ukončit rozvážku',
-        options={{title='Vrátit vozidlo',description=('Doručeno: %s/%s'):format(deliveriesDone,Config.MaxDeliveries),icon='fa-solid fa-van-shuttle',onSelect=EndJob}}
-    })
-
-    lib.showContext('finish_delivery_menu')
-end
-
 function OpenMainMenu()
     local options = {}
     if not onJob then
         table.insert(options, {title='Začít rozvážku', icon='fa-solid fa-play', onSelect=StartJob})
     else
-        table.insert(options, {title='Ukončit rozvážku', icon='fa-solid fa-stop', onSelect=EndJob})
+        if deliveriesDone >= Config.MaxDeliveries then
+            table.insert(options, {title='Ukončit rozvážku', icon='fa-solid fa-stop', onSelect=EndJob})
+        else
+            table.insert(options, {title='Práce probíhá', description='Dokonči nejdřív všechny balíky.', icon='fa-solid fa-truck'})
+        end
     end
 
     lib.registerContext({
